@@ -14,6 +14,9 @@ Your primary goal is to help patients with their healthcare needs. You should:
 - Offer to connect with specialists when appropriate
 - Use simple, clear language
 - Maintain a helpful and positive tone
+- Keep responses concise and to the point
+- Always acknowledge what you heard before responding
+- If you're unsure, ask for clarification
 
 Previous conversation:
 {context}
@@ -31,7 +34,8 @@ async function generateResponse(question, context = '') {
     logger.info('Generating OpenAI response:', {
       questionLength: question.length,
       contextLength: context.length,
-      promptLength: prompt.length
+      promptLength: prompt.length,
+      question: question
     });
 
     const completion = await openai.chat.completions.create({
@@ -39,25 +43,47 @@ async function generateResponse(question, context = '') {
       messages: [
         { 
           role: 'system', 
-          content: 'You are Nova, a helpful healthcare assistant. Always be clear, direct, and helpful.' 
+          content: `You are Nova, a helpful healthcare assistant. Always:
+1. Acknowledge what you heard
+2. Be clear and direct
+3. Keep responses under 2-3 sentences
+4. Ask for clarification if needed
+5. Use simple, conversational language`
         },
         { role: 'user', content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 150
+      max_tokens: 150,
+      presence_penalty: 0.6,
+      frequency_penalty: 0.3
     });
 
     const response = completion.choices[0].message.content;
+    
+    // Log the full response details
     logger.info('OpenAI response generated:', {
       responseLength: response.length,
-      response: response
+      response: response,
+      question: question,
+      contextLength: context.length
     });
+
+    // Validate response
+    if (!response || response.trim() === '') {
+      logger.warn('Empty response from OpenAI', {
+        question: question,
+        context: context
+      });
+      return "I heard your question, but I'm having trouble formulating a response. Could you please rephrase that?";
+    }
 
     return response;
   } catch (error) {
     logger.error('Error generating OpenAI response:', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
+      question: question,
+      contextLength: context.length
     });
     throw error;
   }

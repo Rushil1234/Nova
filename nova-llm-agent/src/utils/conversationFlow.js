@@ -89,7 +89,8 @@ class ConversationManager {
       logger.info('Processing user input:', {
         callSid,
         state: session.state,
-        input: userInput
+        input: userInput,
+        historyLength: session.conversationHistory.length
       });
 
       // Get conversation context
@@ -100,22 +101,36 @@ class ConversationManager {
       logger.info('Direct LLM response:', { 
         callSid, 
         response: llmResponse,
-        contextLength: context.length
+        contextLength: context.length,
+        state: session.state
       });
 
       // 2. Only use RAG if the response is empty or contains specific fallback phrases
       if (!llmResponse || llmResponse.trim() === '' || 
           GENERIC_FALLBACKS.some(fb => llmResponse.toLowerCase().includes(fb.toLowerCase()))) {
-        logger.info('Using RAG for better response', { callSid });
+        logger.info('Using RAG for better response', { 
+          callSid,
+          state: session.state,
+          llmResponse: llmResponse
+        });
         const ragResponse = await this.ragHandler.query(userInput, context);
         if (ragResponse && ragResponse.trim() !== '') {
           llmResponse = ragResponse;
+          logger.info('RAG response used:', {
+            callSid,
+            response: llmResponse,
+            state: session.state
+          });
         }
       }
 
       // 3. If still empty, provide a more helpful response
       if (!llmResponse || llmResponse.trim() === '') {
-        logger.warn('Empty response after LLM and RAG', { callSid });
+        logger.warn('Empty response after LLM and RAG', { 
+          callSid,
+          state: session.state,
+          userInput: userInput
+        });
         llmResponse = `I heard you say "${userInput}". Let me help you with that. Could you please provide more details about what you need?`;
       }
 
@@ -126,10 +141,14 @@ class ConversationManager {
         timestamp: new Date()
       });
 
+      // Update conversation state based on input and response
+      this.updateConversationState(session, userInput, llmResponse);
+
       logger.info('Final response:', {
         callSid,
         responseLength: llmResponse.length,
-        response: llmResponse
+        response: llmResponse,
+        state: session.state
       });
 
       return llmResponse;
@@ -137,18 +156,58 @@ class ConversationManager {
       logger.error('Error in getNextPrompt:', {
         callSid,
         error: error.message,
-        stack: error.stack
+        stack: error.stack,
+        userInput: userInput
       });
       return `I heard you say "${userInput}". I'm here to help. Could you please tell me more about what you need?`;
     }
   }
 
+  updateConversationState(session, userInput, aiResponse) {
+    const input = userInput.toLowerCase();
+    const response = aiResponse.toLowerCase();
+
+    // Log state transition attempt
+    logger.info('Attempting state transition:', {
+      currentState: session.state,
+      userInput: userInput,
+      responseLength: aiResponse.length
+    });
+
+    // Update state based on keywords and context
+    if (input.includes('hello') || input.includes('hi') || input.includes('hey')) {
+      session.state = CONVERSATION_STATES.GREETING;
+    } else if (input.includes('name') || input.includes('call me')) {
+      session.state = CONVERSATION_STATES.DEMOGRAPHICS;
+    } else if (input.includes('insurance') || input.includes('coverage')) {
+      session.state = CONVERSATION_STATES.INSURANCE_VERIFICATION;
+    } else if (input.includes('appointment') || input.includes('schedule')) {
+      session.state = CONVERSATION_STATES.APPOINTMENT_SCHEDULING;
+    } else if (input.includes('goodbye') || input.includes('bye') || input.includes('thank you')) {
+      session.state = CONVERSATION_STATES.GOODBYE;
+    }
+
+    logger.info('State transition complete:', {
+      previousState: session.state,
+      newState: session.state,
+      userInput: userInput
+    });
+  }
+
   getConversationContext(session) {
     // Get the last 5 exchanges for context
     const recentHistory = session.conversationHistory.slice(-10);
-    return recentHistory.map(exchange => 
+    const context = recentHistory.map(exchange => 
       `${exchange.role === 'user' ? 'Patient' : 'Nova'}: ${exchange.content}`
     ).join('\n');
+
+    logger.info('Generated conversation context:', {
+      historyLength: session.conversationHistory.length,
+      contextLength: context.length,
+      state: session.state
+    });
+
+    return context;
   }
 
   cleanupSession(callSid) {

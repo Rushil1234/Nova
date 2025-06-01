@@ -73,6 +73,7 @@ async function processGather(req, res) {
   // Create session if it doesn't exist
   if (!session) {
     session = sessionManager.createSession(callSid);
+    logger.info('Created new session for call:', { callSid });
   }
 
   try {
@@ -94,9 +95,16 @@ async function processGather(req, res) {
 
     // Handle timeout or silence
     if (req.body.SpeechResult === '' || req.body.SpeechResult === undefined) {
+      logger.info('No speech result received, handling timeout/silence:', { 
+        callSid,
+        attempts: session.attempts,
+        shouldTransfer: sessionManager.shouldTransfer(callSid)
+      });
+      
       sessionManager.incrementAttempts(callSid);
       
       if (sessionManager.shouldTransfer(callSid)) {
+        logger.info('Max attempts reached, initiating transfer:', { callSid });
         const twiml = createTwiMLResponse(FALLBACK_RESPONSES.MAX_ATTEMPTS);
         twiml.say({ voice: 'Polly.Amy', language: 'en-GB', rate: '1.2' }, xmlEscape(FALLBACK_RESPONSES.TRANSFER));
         twiml.hangup();
@@ -140,14 +148,23 @@ async function processGather(req, res) {
     // Get AI response using new conversation flow (LLM first, then RAG if needed)
     let aiResponse;
     try {
+      logger.info('Requesting AI response for input:', {
+        callSid,
+        input: userInput,
+        type: inputType,
+        confidence: confidence
+      });
+
       aiResponse = await conversationManager.getNextPrompt(callSid, userInput);
-      logger.info('AI Response:', {
+      
+      logger.info('AI Response received:', {
         callSid,
         response: aiResponse,
         length: aiResponse ? aiResponse.length : 0,
         inputType: inputType,
         confidence: confidence
       });
+
       if (!aiResponse || aiResponse.trim() === '') {
         logger.warn('Empty AI response received', { 
           callSid,
@@ -182,7 +199,13 @@ async function processGather(req, res) {
     // Create response with gather for next input
     const twiml = createGatherResponse(aiResponse, {
       action: '/gather',
-      method: 'POST'
+      method: 'POST',
+      speechTimeout: '3',
+      speechEndThreshold: '1000',
+      language: 'en-US',
+      enhanced: true,
+      speechModel: 'phone_call',
+      timeout: '10'
     });
 
     // Add a polite goodbye if no input is received
