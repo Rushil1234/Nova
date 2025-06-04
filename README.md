@@ -1,193 +1,84 @@
-# Leo - Clinical Documentation AI Assistant
+# Nova - AI-Powered Healthcare Assistant
 
-Leo is an expert clinical documentation AI assistant designed for hospital in-patient rounds. It processes transcribed conversations and extracted text from images to generate concise, accurate, and well-structured progress notes for electronic health records (EHR).
+Nova is an intelligent healthcare assistant that uses AI to provide personalized healthcare support through voice interactions. The system integrates with Twilio for voice communication and uses advanced language models for natural conversation.
 
 ## Features
 
-- Processes transcribed audio conversations from healthcare providers
-- Extracts information from images (whiteboards, charts, handwritten notes)
-- Generates structured progress notes in SOAP/SBAR format
-- Tracks changes between notes
-- Identifies discrepancies in clinical data
-- Maintains professional medical terminology and tone
-- Powered by GPT-4 for accurate medical documentation
+- Voice-based interaction using Twilio
+- AI-powered conversation management
+- RAG (Retrieval-Augmented Generation) for accurate healthcare information
+- Secure patient data handling
+- Multi-language support
+- Appointment scheduling capabilities
+
+## Prerequisites
+
+- Node.js (v14 or higher)
+- Python 3.8 or higher
+- Twilio account
+- OpenAI API key
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/leo.git
-cd leo
+git clone https://github.com/yourusername/nova.git
+cd nova
 ```
 
-2. Create a virtual environment and activate it:
+2. Install Node.js dependencies:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+cd nova-llm-agent
+npm install
 ```
 
-3. Install dependencies:
+3. Set up Python environment:
 ```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file with your configuration:
-```bash
-# OpenAI API Configuration
-OPENAI_API_KEY=your_api_key_here
-
-# LLM Configuration
-LEO_LLM_PROVIDER=openai
-LEO_LLM_MODEL=gpt-4
-LEO_LLM_TEMPERATURE=0.3
-LEO_LLM_MAX_TOKENS=2000
-LEO_LLM_TOP_P=1.0
-LEO_LLM_FREQUENCY_PENALTY=0.0
-LEO_LLM_PRESENCE_PENALTY=0.0
-
-# Clinical Note Configuration
-LEO_CLINICAL_NOTE_DEFAULT_FORMAT=SOAP
-LEO_CLINICAL_NOTE_INCLUDE_VITALS=true
-LEO_CLINICAL_NOTE_INCLUDE_LABS=true
-LEO_CLINICAL_NOTE_INCLUDE_MEDICATIONS=true
-LEO_CLINICAL_NOTE_HIGHLIGHT_ABNORMAL=true
-LEO_CLINICAL_NOTE_MAX_LENGTH=4000
+4. Configure environment variables:
+Create a `.env` file in the root directory with the following variables:
+```
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+OPENAI_API_KEY=your_openai_api_key
 ```
 
 ## Usage
 
 1. Start the server:
 ```bash
-uvicorn server:app --reload
+npm start
 ```
 
-2. The API will be available at `http://localhost:8000`
+2. Configure your Twilio phone number to point to your server's `/voice` endpoint.
 
-3. API Endpoints:
-   - POST `/generate-note`: Generate a progress note from clinical input
-   - POST `/upload-audio`: Upload and process audio file
-   - POST `/upload-image`: Upload and process image file
-   - GET `/health`: Health check endpoint
+## Project Structure
 
-4. Example API request:
-```python
-import requests
-
-# Generate note from text input
-response = requests.post(
-    "http://localhost:8000/generate-note",
-    json={
-        "transcribed_audio": "Doctor: Patient reports improved breathing...",
-        "extracted_text_from_images": "BP: 120/80, HR: 72...",
-        "previous_note": "Previous progress note content...",
-        "patient_info": {
-            "name": "John Doe",
-            "mrn": "12345"
-        }
-    }
-)
-
-# Upload audio file
-with open("rounds_audio.mp3", "rb") as audio_file:
-    response = requests.post(
-        "http://localhost:8000/upload-audio",
-        files={"file": audio_file},
-        data={"patient_info": json.dumps({"name": "John Doe", "mrn": "12345"})}
-    )
-
-# Upload image file
-with open("whiteboard.jpg", "rb") as image_file:
-    response = requests.post(
-        "http://localhost:8000/upload-image",
-        files={"file": image_file},
-        data={"patient_info": json.dumps({"name": "John Doe", "mrn": "12345"})}
-    )
-```
-
-## Note Format
-
-The generated notes follow this structure:
-
-```
----
-[Patient Name / MRN / Date]
-
-Subjective:
-[Patient complaints, reported symptoms]
-
-Objective:
-- Vitals: [List of vital signs]
-- Physical Exam Findings: [Key findings]
-- Labs: [Lab results, highlighting abnormal values]
-- Other Data (images): [Relevant information from images]
-
-Assessment:
-[Clinical impression and diagnosis]
-
-Plan:
-[Treatment plan and next steps]
-
-Changes Since Last Note:
-[New findings, resolved issues, trends]
-
-Action Items / To-Do:
-[List of pending tasks]
-
-Discrepancies/Conflicts:
-[Any conflicting data between sources]
----
-```
-
-## LLM Configuration
-
-Leo uses GPT-4 by default but is designed to be easily configurable for different LLM providers. The current implementation includes:
-
-1. OpenAI GPT-4 integration with:
-   - Configurable temperature and token limits
-   - Structured prompts for different tasks
-   - Error handling and retry logic
-
-2. Extensible architecture for adding new LLM providers:
-   - Abstract `LLMInterface` class
-   - Provider-specific implementations
-   - Configuration-based provider selection
-
-To add a new LLM provider:
-1. Create a new class implementing `LLMInterface`
-2. Add the provider to the configuration options
-3. Update the `_initialize_llm` method in `Leo` class
-
-## Development
-
-The project structure:
-- `leo.py`: Core functionality for processing clinical documentation
-- `server.py`: FastAPI server implementation
-- `config.py`: Configuration management
-- `llm_interface.py`: LLM provider interface and implementations
-- `requirements.txt`: Project dependencies
-- `tests/`: Unit tests
-
-## Testing
-
-Run the test suite:
-```bash
-pytest
-```
-
-The test suite includes:
-- Unit tests for core functionality
-- Mock tests for LLM integration
-- API endpoint tests
-- Input validation tests
+- `nova-llm-agent/` - Main application directory
+  - `src/` - Source code
+    - `controllers/` - Request handlers
+    - `utils/` - Utility functions
+    - `config/` - Configuration files
+    - `rag/` - RAG system implementation
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Twilio for voice communication infrastructure
+- OpenAI for language model capabilities
+- All contributors who have helped shape this project 
